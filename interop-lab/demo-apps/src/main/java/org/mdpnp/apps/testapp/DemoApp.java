@@ -105,7 +105,9 @@ public class DemoApp {
         ol.show(panel.getContent(), DemoApp.goback);
         panel.getBack().setVisible(false);
     }
-
+    // final 表示这个方法不可以被子类的方法重写。final方法比非final方法要快，
+    // 因为在编译的时候已经静态绑定了，不需要在运行时再动态绑定。
+    // final修饰类时，表示类通常功能是完整的，它们不能被继承。
     private static final Logger log = LoggerFactory.getLogger(DemoApp.class);
 
     private abstract static class RunAndDone implements Runnable {
@@ -126,10 +128,14 @@ public class DemoApp {
         }
     }
     
+    //@称为注解，它与类、接口、枚举是在同一个层次，它们都称作为java的一个类型（TYPE）。
+    //它可以声明在包、类、字段、方法、局部变量、方法参数等的前面，用来对这些元素进行说明，注释。
+    //http://wenku.baidu.com/view/503f5ac1d5bbfd0a795673f9.html
     @SuppressWarnings("unchecked")
     public static final void start(final int domainId) throws Exception {
         UIManager.setLookAndFeel(new MDPnPLookAndFeel());
 
+        // 管理waitset和相关的condition，waitset保存app需要的信息，没得到这些信息之前，app一直等待
         final EventLoop eventLoop = new EventLoop();
         final EventLoopHandler handler = new EventLoopHandler(eventLoop);
 
@@ -140,6 +146,7 @@ public class DemoApp {
         TimeZone.setDefault(TimeZone.getTimeZone("America/New_York"));
         final String udi = AbstractSimulatedDevice.randomUDI();
 
+        // 1. 设置participant, id是Main.java传过来的domainID
         final DomainParticipantFactoryQos qos = new DomainParticipantFactoryQos();
         DomainParticipantFactory.get_instance().get_qos(qos);
         qos.entity_factory.autoenable_created_entities = false;
@@ -159,6 +166,7 @@ public class DemoApp {
         pubQos.asynchronous_publisher.asynchronous_batch_thread.priority = Thread.NORM_PRIORITY;
         pubQos.asynchronous_publisher.thread.priority = Thread.NORM_PRIORITY;
 
+        // 2. 创建publisher和subscriber
         final Subscriber subscriber = participant.create_subscriber(DomainParticipant.SUBSCRIBER_QOS_DEFAULT, null, StatusKind.STATUS_MASK_NONE);
         final Publisher publisher = participant.create_publisher(pubQos, null, StatusKind.STATUS_MASK_NONE);
         final TimeManager timeManager = new TimeManager(publisher, subscriber, udi, "Supervisor");
@@ -200,11 +208,15 @@ public class DemoApp {
         panel.getBedLabel().setText("OpenICE");
         panel.getVersion().setText(BuildInfo.getDescriptor());
 
+        //用getContentPane()方法获得JFrame的内容面板，再对其加入组件。
         frame.getContentPane().add(panel);
+        // 卡片式布局，多个组件共享同一个显示空间，通过CardLayout类提供的方法可以切换该空间中显示的组件
         ol = new CardLayout();
         panel.getContent().setLayout(ol);
         panel.getUdi().setText(udi);
 
+        // supervisor的主面板，包括Available App 和 Connected Dev
+        // 面板初始化的时候，appList是AppType里的设备，和deviceList为空，有设别连上了才会有内容
         final MainMenuPanel mainMenuPanel = new MainMenuPanel(AppType.getListedTypes());
         mainMenuPanel.setOpaque(false);
         panel.getContent().add(mainMenuPanel, AppType.Main.getId());
@@ -231,7 +243,7 @@ public class DemoApp {
 //            
 //        });
 //        
-        
+        // 点击Connected Device后弹出的窗口
         final CompositeDevicePanel devicePanel = new CompositeDevicePanel();
         panel.getContent().add(devicePanel, AppType.Device.getId());
 
@@ -242,6 +254,7 @@ public class DemoApp {
         final SampleArrayInstanceModel capnoModel = 
                 new SampleArrayInstanceModelImpl(ice.SampleArrayTopic.VALUE);
 
+        // 设置要传的数据sub/pub和topic
         // VitalSign.EndTidalCO2.addToModel(vitalModel);
         if(!AppType.PCA.isDisabled() || !AppType.PCAViz.isDisabled()) {
             vitalModel.start(subscriber, publisher, eventLoop);
@@ -249,6 +262,8 @@ public class DemoApp {
             objectiveWriter = (InfusionObjectiveDataWriter) publisher.create_datawriter_with_profile((Topic) infusionObjectiveTopic, QosProfiles.ice_library,
                     QosProfiles.state, null, StatusKind.STATUS_MASK_NONE);
             pumpModel.start(subscriber, eventLoop, QosProfiles.ice_library, QosProfiles.state);
+            
+            // 要在面板上显示的生命指标sign都加到vitalModel里
             // VitalSign.HeartRate.addToModel(vitalModel);
             VitalSign.SpO2.addToModel(vitalModel);
             VitalSign.RespiratoryRate.addToModel(vitalModel);
@@ -262,6 +277,7 @@ public class DemoApp {
             capnoModel.start(subscriber, eventLoop, "metric_id = %0 or metric_id = %1 ", params, QosProfiles.ice_library, QosProfiles.waveform_data);
         }
 
+        //设置各功能窗口面板, panel.getcontent.add将各功能加入主panel，之后就可以点进去了
         PCAPanel _pcaPanel = null;
         if (!AppType.PCA.isDisabled()) {
             UIManager.put("TabbedPane.contentOpaque", false);
@@ -285,6 +301,7 @@ public class DemoApp {
         }
         final DataVisualization pcaviz = _pcaviz;
 
+        // 继承JPanel，并实现ListDataListener接口，听取的数据一有变化，自身的Panel的显示就做相应的改动
         RapidRespiratoryRate _rrr = null;
         if (!AppType.RRR.isDisabled()) {
             _rrr = new RapidRespiratoryRate(domainId, eventLoop, subscriber, deviceCellRenderer);
@@ -309,6 +326,9 @@ public class DemoApp {
         }
         final JFrame sim = _sim;
 
+        // 一个窗口可能有鼠标事件、窗口事件等，下面是各类事件的处理
+        
+        // 点击"关闭窗口"后的动作：各功能的面板数据清零，数据模型停止工作
         frame.addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
@@ -366,6 +386,7 @@ public class DemoApp {
         });
         panel.getBack().setVisible(false);
 
+        // 点击"退出应用"的动作，getback()得到的是"Exit App"按钮，ActionEvent指按鼠标或者在文本框里按回车
         panel.getBack().addActionListener(new ActionListener() {
 
             @Override
@@ -375,6 +396,7 @@ public class DemoApp {
 
         });
 
+        // 点击"创建设备"的动作，getCreateAdapter()得到"Create a local ICE Device Adapter"按钮
         panel.getCreateAdapter().addActionListener(new ActionListener() {
 
             @SuppressWarnings({ "rawtypes" })
@@ -400,7 +422,12 @@ public class DemoApp {
                 dia.setLocationRelativeTo(panel);
                 final Configuration c = dia.showDialog();
                 if (null != c) {
-                    Thread t = new Thread(new Runnable() {
+                    //编写线程运行时执行的代码有两种方式：一种是创建Thread子类的一个实例并重写run方法，第二种是创建类的时候实现Runnable接口。
+                	//这里用的是第二种，新建的线程t能执行继承自Runnable的自定义的run方法。
+                	//实现了Thread子类的实例可以执行多个实现了Runnable接口的线程。一个典型的应用就是线程池。线程池可以有效的管理实现了Runnable接口的线程，
+                	//如果线程池满了，新的线程就会排队等候执行，直到线程池空闲出来为止。而如果线程是通过实现Thread子类实现的，这将会复杂一些。
+                	//这种匿名创建的类，java会在编译时生成形如"文件名$数字"的类。
+                	Thread t = new Thread(new Runnable() {
                         public void run() {
                             try {
                                 DomainParticipantQos pQos = new DomainParticipantQos();
@@ -427,14 +454,21 @@ public class DemoApp {
                         }
                     });
                     t.setDaemon(true);
+                    //这里常见的错误是使用t.run()方法。这样的后果是当前线程所执行run，并不是由刚创建的新线程t执行。
+                    //想要让创建的新线程执行run()方法，必须调用新线程的start方法。
+                    //http://ifeve.com/creating-and-starting-java-threads/
                     t.start();
                 }
             }
             
         });
 
+        // getAppList和getDeviceList分别对应supervisor界面中的available app和connected device两列，
+        // 并显示在supervisor的面板上。
+        // appList在mainMenuPanel初始化的时候已经有了，deviceList则要在设备创建完了才能确定
         mainMenuPanel.getDeviceList().setModel(nc);
 
+        // 点击app后的动作，用cardlayout.show打开对应的应用卡片窗口
         mainMenuPanel.getAppList().addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
@@ -446,13 +480,16 @@ public class DemoApp {
                     switch (appType) {
                     case RRR:
                         if (null != rrr) {
+                        	// 设置"Exit App"按钮，以及按下按钮后的动作
                             setGoBack(AppType.Main.getId(), new Runnable() {
                                 public void run() {
                                     // rrr.setModel(null, null);
                                 }
                             });
                             panel.getBedLabel().setText(appType.getName());
+                            // 更新数据显示
                             rrr.setModel(capnoModel);
+                            //指定父窗口，和要显示的子窗口id
                             ol.show(panel.getContent(), appType.getId());
                         }
                         break;
@@ -516,6 +553,8 @@ public class DemoApp {
                 super.mouseClicked(e);
             }
         });
+
+        // 点击device后的动作，用cardlayout.show打开对应的设备监视器的卡片窗口
         mainMenuPanel.getDeviceList().addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {

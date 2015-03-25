@@ -125,11 +125,13 @@ public class RapidRespiratoryRate extends JPanel implements ListDataListener, Ru
             }
             
         });
+        // create device选项打勾之后的动作
         device.addActionListener(new ActionListener() {
 
             @Override
             public void actionPerformed(ActionEvent e) {
                 if (device.isSelected()) {
+                	// 没有对应device则创建一个rrDevice，加到当前domain中
                     if (rrDevice == null) {
                         rrDevice = new RespiratoryRateDevice(domainId, eventLoop);
                         // TODO Make this more elegant
@@ -171,6 +173,7 @@ public class RapidRespiratoryRate extends JPanel implements ListDataListener, Ru
             selectedUdi = ((ice.SampleArray) selected).unique_device_identifier;
         }
 
+        // 是否有新数据，如果有则通知Listener更新显示之
         capnoSources.setModel(null == model ? new DefaultListModel() : model);
         if (null != selectedUdi && model != null) {
             for (int i = 0; i < model.getSize(); i++) {

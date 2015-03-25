@@ -215,6 +215,19 @@ public class Main {
         verifyQosLibraries();
     }
 
+    public static String conf2str(Configuration runConf) throws Exception {
+        String str;
+        
+        switch (runConf.getApplication()) {
+        case ICE_Device_Interface: str = "Interface"; break;
+        case ICE_Supervisor: str = "Supervisor"; break;
+        case ICE_ParticipantOnly: str = "Participant"; break;
+        default: str = "None";
+        }
+        
+        return str;
+    }
+    
     public static void main(String[] args) throws Exception {
         // TODO this should be external
         System.setProperty("java.net.preferIPv4Stack", "true");
@@ -252,22 +265,29 @@ public class Main {
         }
 
         if (!cmdline) {
-            ConfigurationDialog d = new ConfigurationDialog(runConf, null);
+        	//运行时出现的第一个窗口，此时runConf为null
+            ConfigurationDialog d = new ConfigurationDialog(runConf, null); 
+            log.warn("---newCD");
 
             d.setIconImage(ImageIO.read(Main.class.getResource("icon.png")));
-            runConf = d.showDialog();
+            //第一次运行到这里的时候runConf还是null，对这个窗口的修改被读入
+            runConf = d.showDialog(); 
             // It's nice to be able to change settings even without running
             if (null == runConf) {
-                writeConf = d.getLastConfiguration();
+                writeConf = d.getLastConfiguration(); //log.warn("---runConf=null");
+                //if (null == writeConf) log.warn("---writeConf=null"); else log.warn("---wc=Nonull");
             }
         } else {
             // fall through to allow configuration via a file
+        	log.warn("---cmdline=1");
         }
+        log.warn("---" + (cmdline?"1":"0"));
 
         if (null != runConf) {
             writeConf = runConf;
         }
 
+        // writeConf是要写到配置文件里的，这样下次启动就直接读配置文件里的文件
         if (null != writeConf) {
             if (!jumpStartSettings.exists()) {
                 jumpStartSettings.createNewFile();
@@ -290,6 +310,8 @@ public class Main {
             }
         }
 
+        //运行之后不开始就结束，执行最后一个分支；
+        //运行之后start再结束，执行第一个分支
         if (null != runConf) {
 
             {
@@ -297,7 +319,8 @@ public class Main {
                 // XML profiles
                 // which Exception prevents a more useful Exception throwing
                 // later
-                try {
+                log.warn("---runConf = 1, cmdline=" +  (cmdline?"1":"0"));
+            	try {
                     boolean userIceLibrary = false;
 
                     File userProfiles = new File("USER_QOS_PROFILES.xml");
@@ -322,6 +345,7 @@ public class Main {
                     DomainParticipantFactoryQos qos = new DomainParticipantFactoryQos();
                     factory.get_qos(qos);
 
+                    //从文件中读取对qos的配置，包括peers等，并写入factory.qos
                     if (!userIceLibrary) {
                         loadIceQosLibrary(qos);
                         log.debug("Loaded default ice_library QoS");
@@ -352,8 +376,9 @@ public class Main {
                 break;
             }
         } else if (cmdline) {
-            Configuration.help(Main.class, System.out);
-        } else {
+            Configuration.help(Main.class, System.out); log.warn("---cmdline=1 & runConf=0");
+        } else { //首次运行时会在这到个分支
+        	log.warn("---runConf=0 & cmdline=0");
 
         }
         log.trace("This is the end of Main");
